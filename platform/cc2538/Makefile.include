@@ -1,0 +1,82 @@
+###############################################################################
+
+INC_PATH += -I $(PLATFORM_SRC)/library/src
+INC_PATH += -I $(PLATFORM_SRC)/library/inc
+
+VPATH += $(PLATFORM_SRC)/library/src
+VPATH += $(PLATFORM_SRC)/library/inc
+
+###############################################################################
+
+# Define the CC2538 library
+LIB_NAME = libcc2538.a
+LIB_FILE = $(PLATFORM_SRC)/$(LIB_NAME)
+
+# Check if the CC2538 library exists
+ifeq (,$(wildcard $(LIB_FILE)))
+$(error The CC2538 library ($(LIB_NAME)) cannot be found)
+endif
+
+###############################################################################
+
+# Append to the files to compile
+SRC_FILES += cc2538_startup.c
+
+# Append to the files to compile
+SRC_FILES += board.c bsp_timer.c cpu.c debug.c flash.c gpio.c \
+             ieee-addr.c leds.c radio.c random.c uart.c
+
+###############################################################################
+
+# Define the linker script
+LINKER_SCRIPT = $(PLATFORM_SRC)/cc2538_linker.lds
+
+###############################################################################
+
+# Configure the Segger J-Link
+JLINK_NAME = JLinkGDBServer
+JLINK_PATH = /opt/segger/JLink
+JLINK_OPT = -device
+JLINK_DEV = CC2538SF53
+
+# Configure the GDB
+NEMIVER_NAME = nemiver
+NEMIVER_IP = localhost:2331
+NEMIVER_GDB = `which arm-none-eabi-gdb`
+NEMIVER_EXT = elf
+
+# Configure the GDB client
+GDB_BATCH = --batch
+GDB_CMD = --command
+GDB_EXT = gdb
+
+# Configure the BSL client
+BSL_PYTHON = python
+BSL_NAME = cc2538-bsl.py
+BSL_PATH = $(PROJECT_HOME)/tools/cc2538-bsl
+BSL_OPT = --bsl -e -w -b 115200
+BSL_EXT = hex
+
+###############################################################################
+
+.PHONY: jlink load debug bsl
+
+jlink:
+	@echo "Initializing Segger J-Link..."
+	@$(JLINK_PATH)/$(JLINK_NAME) $(JLINK_OPT) $(JLINK_DEV)
+
+load:
+	@echo "Loading $(PROJECT_NAME) into target..."
+	@$(GDB) $(GDB_BATCH) $(GDB_CMD)=$(PROJECT_NAME).$(GDB_EXT) $(PROJECT_NAME).elf
+
+debug:
+	@echo "Debugging $(PROJECT_NAME) into target..."
+	@$(GDB) $(GDB_CMD)=$(PROJECT_NAME).$(GDB_EXT) $(PROJECT_NAME).elf
+
+nemiver: load
+	@echo "Launching debugger..."
+	@$(NEMIVER_NAME) --remote=$(NEMIVER_IP) --gdb-binary=$(NEMIVER_GDB) $(PROJECT_NAME).$(NEMIVER_EXT)
+
+bsl:
+	@echo "Loading $(PROJECT_NAME) into target..."
+	@$(BSL_PYTHON) $(BSL_PATH)/$(BSL_NAME) $(BSL_OPT) $(PROJECT_NAME).$(BSL_EXT)

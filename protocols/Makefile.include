@@ -1,0 +1,12 @@
+# Define the protocols path
+PROTOCOLS_SRC = $(PROTOCOLS_PATH)
+PROTOCOLS_INC = $(PROTOCOLS_PATH)
+
+# Append to the source and include paths
+INC_PATH += -I $(PROTOCOLS_INC)
+
+# Extend the virtual path
+VPATH += $(PROTOCOLS_SRC) $(PROTOCOLS_INC)
+
+# Append to the files to compile
+SRC_FILES += dq.c fsa.c mac.c wor.c

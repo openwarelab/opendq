@@ -1,0 +1,2 @@
+# Append to the files to compile
+SRC_FILES += crc16.c hdlc.c library.c packet_buffer.c serial.c virtual_timer.c

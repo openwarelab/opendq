@@ -1,0 +1,13 @@
+# Define the library path
+LIBRARY_SRC = $(LIBRARY_PATH)/src
+LIBRARY_INC = $(LIBRARY_PATH)/inc
+
+# Append to the include path
+INC_PATH += -I $(LIBRARY_INC)
+
+# Extend the virtual path
+VPATH += $(LIBRARY_SRC) $(LIBRARY_INC)
+
+# Include the Makefiles in the various subdirectories in the current folder
+include $(LIBRARY_SRC)/Makefile.include
+

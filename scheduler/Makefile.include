@@ -1,0 +1,12 @@
+# Define the kernel path
+SCHEDULER_SRC = $(SCHEDULER_PATH)
+SCHEDULER_INC = $(SCHEDULER_PATH)
+
+# Append to the include path
+INC_PATH += -I $(SCHEDULER_INC)
+
+# Extend the virtual path
+VPATH += $(SCHEDULER_SRC) $(SCHEDULER_INC)
+
+# Append to the files to compile
+SRC_FILES += scheduler.c

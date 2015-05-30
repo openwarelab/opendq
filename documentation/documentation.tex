@@ -1,0 +1,124 @@
+\documentclass[11pt,a4paper,twoside]{report}
+
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{fancyhdr}
+\usepackage[a4paper]{geometry}
+\usepackage[acronym,toc]{glossaries}
+\usepackage[pdftex]{graphicx}
+\usepackage{setspace}
+\usepackage{tocloft}
+\usepackage{pdfpages}
+\usepackage{multirow}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{lineno}
+\usepackage{moreverb}
+\usepackage{url}
+\usepackage{soul}
+\usepackage{booktabs}
+\usepackage[caption=false]{subfig}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{fix-cm}
+\usepackage{array}
+\usepackage{arydshln}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[toc,page]{appendix}
+\usepackage[pdftex,colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red,hidelinks]{hyperref}
+
+\linenumbers
+
+\fancyhf{}
+\fancyhead[LO]{\leftmark}
+\fancyhead[RE]{\rightmark}
+\fancyfoot[C]{\thepage}
+
+\graphicspath{{./images/}}
+
+\begin{document}
+
+% Cover
+\pagestyle{empty}
+\include{00-cover}
+
+% Copyright
+\cleardoublepage
+\pagestyle{empty}
+\include{00-copyright}
+
+% Table of contents
+\cleardoublepage
+\pagestyle{plain}
+\pagenumbering{roman}
+\phantomsection
+\addcontentsline{toc}{chapter}{Table of Contents}
+\renewcommand{\contentsname}{Table of Contents}
+\tableofcontents
+
+% List of figures
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+
+% List of tables
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Tables}
+\listoftables
+
+% Chapter 1
+\cleardoublepage
+\pagestyle{fancy}
+\setcounter{page}{1}
+\pagenumbering{arabic}
+\input{01-introduction}
+
+% Chapter 2
+\cleardoublepage
+\pagestyle{fancy}
+\input{02-hardware}
+
+% Chapter 3
+\cleardoublepage
+\pagestyle{fancy}
+\input{03-installation}
+
+% Chapter 4
+\cleardoublepage
+\pagestyle{fancy}
+\input{04-running}
+
+% Chapter 5
+\cleardoublepage
+\pagestyle{fancy}
+\input{05-software}
+
+% Chapter 6
+\cleardoublepage
+\pagestyle{fancy}
+\input{06-operation}
+
+% Chapter 7
+\cleardoublepage
+\pagestyle{fancy}
+\input{07-results}
+
+% References
+\cleardoublepage
+\pagestyle{fancy}
+\phantomsection \label{bibliography}
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\appendix
+\input{08-appendix}
+
+\end{document}

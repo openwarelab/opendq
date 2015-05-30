@@ -1,0 +1,139 @@
+%%
+% Understanding OpenDQ
+%%
+\chapter{Understanding OpenDQ}
+\label{lab:05-software}
+This chapter presents the firmware and software that compose the OpenDQ project. The firmware is the code written in C that execute on the OpenMote-CC2538 board, whereas the software is the code written in Python that execute on the target PC.
+
+In general, the OpenDQ project is organized according to the following directory structure:
+\begin{itemize}
+\item \textbf{board}: Contains the board definitions for the OpenMote-CC2538 board.
+\item \textbf{documentation}: Contains the \LaTeX source code of the OpenDQ documentation.
+\item \textbf{library}: Contains the high-level firmware that runs on the OpenMote-CC2538 board.
+\item \textbf{platform}: Contains the low-level firmware that runs on the OpenMote-CC2538 board.
+\item \textbf{projects}: Contains the projects that implement the Node, the Gateway and the Application functionality.
+\item \textbf{protocols}: Contains the implementation of LPL, i.e., WOR, and the MAC layer protocols, i.e., FSA and DQ.
+\item \textbf{scheduler}: Contains the scheduler that runs on the OpenMote-CC2538 board and allows to execute tasks.
+\item \textbf{tools}: Contains the utilities that allow to flash the OpenMote-CC2538 board using the serial port.
+\end{itemize}
+
+In the following subsections a more detailed description of each folder in the is presented, including the files that compose it and its functionality. It is important to mention that the OpenDQ project uses a $Makefile$ system to build the firmware and load it to the OpenMote-CC2538 board. The $Makefile$ system is distributed among all directories and the base $Makefile$ file is stored in each project, i.e., Gateway or Node. Each project is responsible to include the remaining $Makefile$ include files, which are spread across all directories to be able to generate the binary of each project. However, the user does not need to concern with the operation of the $Makefile$ system unless it needs to port the code to a new platform, as described in the previous section.
+
+%%
+% Board
+%%
+\label{03-board}
+\section{Board}
+The board folder contains the header files that define macro directives that associate generic pin and port names with particular pin and ports names for each existing platform. Currently, only the $openmote-cc2538$ board is defined. For example, in the $openmote-cc2538.h$ file the $LED\_RED\_PORT$ and $LED\_RED\_PIN$ macros are associated with $GPIO\_C\_PORT$ and $GPIO\_PIN\_4$ respectively. There are other GPIO-dependent modules, i.e., the UART, that should also be moved to the $openmote-cc2538.h$ file to ease portability of the code to other platforms based on the same SoC. However, at the moment of writing such modules have not been integrated yet in the $openmote-cc2538.h$ header file.
+
+%%
+% Documentation
+%%
+\label{03-documentation}
+\section{Documentation}
+The $documentation$ folder contains the source files, images and schematics of the OpenDQ documentation. The OpenDQ documentation is written in \LaTeX for the typesetting. Thus, to compile the documentation into a $pdf$ file one needs to execute the $pdflatex documentation.tex$ command. It is possible that the command needs to be executed several times to ensure that the Figures, Tables and References are up to date.
+
+%%
+% Library
+%%
+\label{03-library}
+\section{Library}
+The $library$ folder contains the high-level code that runs on the Texas Instruments CC2538 SoC and allows to control timing, manage packets and enable communications with the target computer via a serial port, among others. The library code is platform independent and is organized in two subdirectories, $inc$ and $src$. The $inc$ directory contains the header files that define the modules interface. The $src$ directory contains the implementation of each module interface.
+
+In particular, the $library$ folder defines and implements the following components.
+\begin{itemize}
+\item \textbf{crc16}. Defined in $crc16.c$ and $crc16.h$ files. Provides a CRC (Cyclic Redundancy Check) implementation using the 16-bit CRC-CCITT protocol with a $0x1189$ polynomial. The implementation is based on a look-up table (256 x 8-bit entries, 256 bytes) stored in Flash and uses $0xFFFF$ as the initial seed. In order to compute the CRC, the code first needs to initialize the module by calling the $crc\_init$ function. After that, the code can call the $crc16\_push$ function for each byte to update the CRC state. At any iteration the code can also read the current value of the CRC state by calling the $crc16\_get$ function. After the computation of a message, the code can check the CRC state by calling the $crc16\_check$ function. If the CRC check is successful the result will be 1. If the CRC check is unsuccessful the result will be 0. 
+
+\item \textbf{hdlc}. Defined in $hdlc.c$ and $hdlc.h$ files. Provides an implementation of HDLC (High-Level Data Link Control) protocol. HDLC is a synchronous data-link layer protocol that provides frame structure to asynchronous protocols, i.e., UART (Universal Asynchronous Receiver-Transmitter). The HDLC includes a flag byte ($0x7F$) to indicate the start and end of frames. To ensure that the header and footer flags are not transmitted by error as part of the message, HDLC uses an escape byte ($0x7D$) and a escape mask ($0x20$). After the header flag, the HDLC includes a header that includes a command (1~byte) and the node address (2~bytes). After the payload the HDLC includes a footer with a 16-bit CRC. To compute the CRC, the HDLC module uses the CRC16 module described before. To use the HDLC module, the code first needs to initialize the module by calling the $hdlc\_init$ function. After that, the HDLC module can be used to create an HDLC frame to be received by using the $hdlc\_open\_rx$, $hdlc\_put\_rx$ and $hdlc\_close\_rx$ functions. The HDLC module can also be used to create an HDLC frame to be transmitted by using the $hdlc\_open\_tx$, $hdlc\_put\_tx$ and $hdlc\_close\_tx$ functions. In order to transmit and receive the HDLC frames the $serial$ module is used.
+
+\item \textbf{packet\_buffer}. Defined in $packet\_buffer.c$ and $packet\_buffer.h$. Provides a statically allocated buffer of $packet\_buffer\_t$ elements that is used by other modules, i.e., the MAC protocols, to transmit or receive packets to/from the radio transceiver. Currently, the $packet\_buffer$ variable can hold up to 16 packets, as defined by the $PACKET\_BUFFER\_SIZE$ macro. However, that can be changed at compile time to accommodate a larger number of $packet$s at the expense of increasing the RAM footprint. The $packet\_buffer\_t$ structure contains the buffer where the bytes are allocated and its size, as well as several information fields, i.e., RSSI (Received Signal Strength Indicator), LQI (Link Quality Indicator) and CRC (Cyclic Redundancy Check). In order to use the $packet\_buffer$ module the code first need to call the $packet\_buffer\_init$ function. After that, to transmit or receive a packet the code first needs to obtain an entry by calling the $packet\_buffer\_get$. This call returns a pointer to the $packet\_buffer$ entry to be used, which can then be used by reading or writing the appropriate fields. Once the entry has been used, either to transmit or receive, the code needs to release the entry by calling the $packet\_buffer\_release$ function. 
+
+\item \textbf{serial}. Defined in $serial.c$ and $serial.h$. Provides an abstraction to transmit and receive messages to/from the computer via a serial port, i.e., UART. The serial module is implemented on top of the HDLC module, which ensures that messages being transmitted or received are correctly detected and decoded using the CRC module; if a message is corrupted it is discarded automatically. In order to use the $serial$ module the code first need to call the $serial\_init$ function. After that, the code can use the $serial\_push\_message$ to send messages to the computer through the serial port. The function $serial\_register\_mote2pc\_cb$ can be used externally to register the execution of functions when a message has been transmitted. When a message is received from the serial port it is parsed by the $serial\_parse\_msg$. Tasks can also register to receive certain messages from the computer using the $serial\_register\_pc2mote\_cb$ function. Internally, the transmit and receive of a message is carried out byte by byte using the $serial\_rx\_init$, $serial\_rx\_byte$, $serial\_rx\_done$, $serial\_tx\_init$, $serial\_tx\_byte$ and $serial\_tx\_done$. To hold the messages the $serial$ module defines two 128-byte buffers, one to receive and the other to transmit, as well as a $serial\_vars\_t$ structure where it stores all the data related to its operation, i.e., state, pointers to buffers, etc. Finally, the $serial$ module also provides a function to check if the serial port is busy ($serial\_busy$) and a function to reset it ($serial\_reset$).
+
+\item \textbf{virtual\_timer}. Defined in $virtual\_timer.c$ and $virtual\_timer.h$. Provides a mechanism to define multiple timers that can run simultaneously but are multiplexed to a single physical timer. Currently, the $virtual\_timer$ implementation runs from the RTC (Real-Time Clock) on the OpenMote-CC2538 board. The RTC unit is clocked at 32.768~kHz and is 32~bit width, meaning that each \textit{tick} is equivalent to 30.51~us and each $virtual\_timer$ can count up to 36~hours. The information related to each $virtual\_timer$, i.e., status (stopped or running), type (periodic or one shot), total ticks, remaining ticks, callback and callback priority, is stored in a $virtual\_timer\_t$ structure. To store all $virtual\_timer$s and other relevant information, i.e., mode and timeout, the $virtual\_timer$ defines a $virtual\_timer\_vars$ variable. The $virtual\_timer$s are statically allocated in a buffer. Currently, the buffer variable can hold up to 16 $virtual\_timer$s, as defined by the $VIRTUAL\_TIMER\_MAX\_TIMERS$ macro. However, that can be changed at compile time to accommodate a larger number of $virtual\_timer$s at the expense of increasing the RAM footprint. In order to use the $virtual\_timer$ module the code first need to call the $virtual\_timer\_init$ function. A $virtual\_timer$s can then be started by calling the $virtual\_timer\_start$ and passing the relevant information, i.e., type, ticks, callback and priority. The $virtual\_timer\_start$ function returns a handler for the $virtual\_timer$ in use. When a $virtual\_timer$ expires the $virtual\_timer$ module pushes the task to the scheduler with the appropriate priority. Such approach is taken to ensure that code is not executed in an interrupt context, which could affect the timing behaviour of the MAC layer. Finally, $virtual\_timer$s can be stopped during operation by calling the $virtual\_timer\_stop$ function and passing in the $virtual\_timer$ handler that the $virtual\_timer\_start$ function returns.
+\end{itemize}
+
+%%
+% Platform
+%%
+\section{Platform}
+The $platform$ folder contains the low-level code that runs on the Texas Instruments CC2538 SoC and allows to control its peripherals, i.e. GPIO, UART, timers and radio, among others. The platform code is platform dependent and is organized into two subdirectories, $inc$ and $src$. The $inc$ directory contains the header files that define the modules interface, whereas the $src$ directory contains the implementation of each module interface. In addition to providing the implementation of each module, the $src$ directory also includes the source code of the Texas Instruments CC2538 Foundation Firmware library \cite{cc2538ff}. The library is used as a basis to implement the functionality of each module, i.e., GPIO, timers and UART, and needs to be compiled prior to building the Node or Gateway project.
+
+The $platform$ folder contains the following modules.
+\begin{itemize}
+\item \textbf{board}. Contains the function that initializes the board by calling the other modules and provides a function to trigger the bootloader mode by pressing the user button.
+\item \textbf{bsp\_timer}. Contains the functions to initialize and control the RTC (Real-Time Clock), which is driven at 32.768~kHz and is used by the $virtual\_timer$. 
+\item \textbf{cpu}. Contains the functions to initialize the GPIOs and clocks to a default state. It initializes all the GPIOs to output low and configures the system clocks to 32.768~kHz for the RTC and 32~MHz for the CPU and the radio transceiver. It also contains the functions to reset the CPU, put the CPU in idle and sleep modes, and enable and disable the global interrupts.
+\item \textbf{debug}. Contains the functions to control the GPIO lines devoted to debug, which can be on, off or toggled.
+\item \textbf{flash}. Contains the functions to write to the Flash memory, which is used to trigger the bootloader mode when pressing the user button.
+\item \textbf{gpio}. Contains the functions to initialize and configure the GPIOs as input or output. It also provides functions to control the GPIOs (on, off or toggle) and to read its status (high or low). For input GPIOs it also provides the means to register interrupts.
+\item \textbf{ieee-addr}. Contains a function to read the IEEE EUI-64 address from Flash memory and a function that converts the IEEE EUI-64 address into a 16~bit addresses.
+\item \textbf{leds}. Contains the functions to initialize and control the LEDs (red, yellow, orange and green) on the board, which can be on, off or toggled.
+\item \textbf{radio}. Contains the functions to initialize and control the IEEE~802.15.4 radio transceiver. It provides functions to transmit and receive packets, as well as functions to set the channel, change the transmit power and read the RSSI.
+\item \textbf{random}. Contains the functions to initialize and generate pseudo-random numbers. The module is initially seeded by noise read from the radio transceiver and implements a Galois shift register with 16 taps to generate the pseudo-random number sequence.
+\item \textbf{uart}. Contains the functions to initialize and control the UART module. It provides functions to read and write bytes from the UART module. Since its operation is interrupt-driven, it also provides functions to register and unregister callbacks.
+\end{itemize}
+
+In addition to the modules that control the hardware, the $platform$ folder also defines the following files.
+\begin{itemize}
+\item \textbf{cc2538\_include.h}. Contains the headers of the Texas Instruments CC2538 Foundation Firmware library \cite{cc2538ff}. All modules that are implemented for the $cc2538$ platform need to include this file.
+\item \textbf{cc2538\_linker.lds}. Contains the linker script for the $cc2538$ platform. The linker script describes the memory sections, i.e., RAM, Flash, etc., where the code and the variables are stored.
+\item \textbf{cc2538\_startup.c}. Contains the start up code for the $cc2538$ platform. The start up code is responsible to initialize the board and to call the $main$ function, which initializes the other modules and starts the application code.
+\end{itemize}
+
+% Porting OpenDQ
+\subsection{Porting OpenDQ}
+In order to port the OpenDQ project to a new micro-controller based on the ARM Cortex-M architecture\footnote{In order to port OpenDQ to other architectures, i.e., MSP430, it is also necessary to install the toolchain to compile and debug for that particular architecture.} there are only three steps required.
+
+First, create a new directory in the $platform$ folder. For example, to port the OpenDQ project to the $STM32L1$ micro-controller a $stm32l1$ directory needs to be created. Inside the $stm32l1$ directory all the different modules need to be implemented according to their interface, as defined in the $inc$ directory. That is, all the functions need to be implemented to provide the same functionality as the current $cc2538$ directory. Of special importance is the fact that the implementation of the $bsp\_timer$ module needs to provide a tick rate of 30.51~us. This is because the $virtual\_timer$ relies on the $bsp\_timer$ to provide accurate timing to all other modules, i.e., MAC protocols implementation.
+
+Second, modify the $Makefile$ system that is used to build the OpenDQ project in order to include the $stm32l1$ platform. In particular, it is necessary to modify the $Makefile.include$ under the $stm32l1$ directory to ensure that all files are properly compiled and the libraries (if any) are linked correctly. The most important parts are defining the files that need to be compiled, the name of the linker script and the configuration for the tools related to the platform, i.e., JLinkGDBServer and bootloader script.
+
+Third, create a file with the platform name in the $board$ folder and define all the macro directives that associate generic pin and port names with particular pin and ports names of then new platform. This step is optional but highly recommended in order to maintain a clear separation between the platform specific and platform independent code.
+
+After completing these three steps it should be possible to compile the Node or Gateway projects by issuing the following command $make TARGET=stm32l1$ from the appropriate directory. 
+
+%%
+% Projects
+%%
+\section{Projects}
+The $projects$ folder is split into three subdirectories. First, the firmware that runs on the OpenMote-CC2538 and implements the gateway and node functionality is contained within the $Gateway$ and $Node$ directories. Second, the software that runs on the computer and implements the computer functionality to display the results is contained within the $Applications$ directory. The firmware that runs on the OpenMote-CC2538 boards is written in C, whereas the the software that runs on the target computer, i.e. a PC or a Raspberry Pi, is written in Python. The following subsections provide an overview of the software architecture for the firmware and the software respectively.
+
+\begin{itemize}
+\item \textbf{Application}. The $Application$ project contains the Python code that runs on a computer and controls the operation of the network, i.e., trigger the synchronization phase and the collect data from the nodes during the data collection phase. The application receives inputs using the GUI (Graphical User Interface) for the various input parameters, i.e., data collection duration and MAC protocol to execute. When the user triggers the data collection process by pressing the start button, the application sends a command to the gateway through the serial port. The command contains information regarding the duration of the data transmission phase and the MAC protocol to execute, i.e., FSA or DQ\footnote{In case FSA is selected, the application also determines the number of slots per frame. In case DQ is selected, the number of slots per frame is ignored.}. After that, the application waits to receive the packets send by the gateway through the serial port and calculates statistics based on the results, i.e., number of packets received for each node in the network during the data transmission phase. The end of the data transmission phase is determined by the reception of a command from the gateway using the serial interface. When such command is received the application stops collecting statistics and processes the results of the data collection phase to create a graphic that is displayed in the GUI.
+
+\item \textbf{Gateway}. The $Gateway$ project implements all the functionality required for a gateway device to synchronize all the nodes that are present within its communication range and to provide feedback to the application regarding the packets received during the data transmission phase. Upon boot the gateway is in idle mode, waiting to receive a command from the application through the serial port to start the data collection phase. When the gateway receives such command it triggers the start of the synchronization phase using the appropriate parameters, i.e., duration and MAC protocol of the data transmission phase, which are passed as parameters from the application. During the synchronization phase the gateway transmits the wake-up packets that are used to synchronize the nodes. Once the synchronization phase finishes the gateway enters the data transmission phase. In the data transmission phase the gateway executes the configured MAC protocol, i.e., FSA or DQ, for the configured amount of time. For each packet received the gateway processes it and sends the relevant information to the application through the serial port. Once the duration of the data transmission phase is elapsed the gateway sends a command to the application to indicate such event. After that, the gateway resets itself and waits for a new trigger to start the synchronization and data transmission phases.
+
+\item \textbf{Node}. The $Node$ project implements all the functionality required for a node device to wake-up using the WOR mechanism during the synchronization phase and to transmit data packets to the gateway using the appropriate MAC protocol, e.g., DQ or FSA, during the data transmission phase. Upon boot the node enters the WOR mode, where it periodically turns on the radio transceiver and tries to receive a wake-up packet from the gateway. When a wake-up packet from the coordinator is successfully received the node parses the information contained in the packet, which contains information regarding the time to start the data transmission phase and the MAC protocol to execute. When the data transmission phase starts the node transmits packets using the appropriate MAC protocol, i.e. FSA or DQ. During the data transmission phase the node transmits as much data packets as allowed by the MAC protocol in order to create a saturation condition. Depending on the MAC protocol being executed, i.e. FSA or DQ, the node includes information regarding the state of the MAC layer on the data packet. For example, in DQ the node includes information regarding the length of the CRQ and the DTQ. Such information is then forwarded by the gateway to the Application on the computer via the serial interface. The information is then used to create the statistics that are displayed after the data collection phase terminates. It is important to remark that nodes are not aware of the duration of the data transmission phase. Instead, the nodes reset themselves upon loosing synchronization with the gateway.
+\end{itemize}
+
+%%
+% Protocols
+%%
+\section{Protocols}
+The $protocols$ folder contains the implementation of the synchronization mechanism, i.e., WOR, and the MAC protocols for the data transmission phase, i.e., DQ and FSA. Given the importance of such protocols in the OpenDQ operation, the description can be found in Section\~ref{sec:06-operation}.
+
+%%
+% Scheduler
+%%
+\section{Scheduler}
+The $scheduler$ folder contains the system scheduler in two files named $scheduler.c$ and $scheduler.h$. The system scheduler is responsible of queuing and executing tasks from other modules. Tasks in the scheduler are represented by the $task\_cb\_t$ structure, which is a pointer to the regular C function that has to be executed by the scheduler. To execute tasks the scheduler implements a priority-based cooperative mechanism with three priorities, i.e., minimum, medium and maximum, according to the $task\_prio\_t$ enumerate.
+
+The scheduler defines two data structures that are used to define and store the tasks to be executed.
+\begin{itemize}
+\item $task\_list\_t$. Defines the attributes of a task to be executed by the scheduler. The structure contains a pointer to the function to be executed ($task\_cb\_t$), the task priority ($task\_prio\_t$) and a pointer to the next task.
+\item $scheduler\_vars\_t$. Contains an array of $task\_list\_t$ variables where the tasks to be executed by the scheduler are stored and also contains a pointer to the first task to be executed. Currently the $task\_list\_t$ is limited to 16 tasks according to the $TASK\_BUFFER\_SIZE$ macro, but this value can be changed at compile time to accommodate more tasks at the expense of increasing memory footprint.
+\end{itemize}
+
+The scheduler contains three public functions, as described next.
+\begin{itemize}
+\item $scheduler\_init$. Initializes the $scheduler\_t$ data structure. Needs to be executed as part of the initialization process, i.e., $main$. 
+\item $scheduler\_start$. Pushes the $scheduler\_toggle\_led$\footnote{The $scheduler\_toggle\_led$ task blinks the green LED of the OpenMote-CC2538 board periodically using the $virtual_timer$ module to indicate that the system is running normally. By default the LED is off for 32704~ticks (998~ms) and on for 64~ticks (2~ms).} task to the queue and starts the scheduling loop, which never returns. The scheduler loop will execute tasks as fast as they become available and will put the CPU in sleep mode in case there is no task to execute. 
+\item $scheduler\_push$. Adds a task to the scheduling queue. The tasks is defined as a callback to the function to be executed ($task\_cb\_t$) and its priority ($task\_prio\_t$). Notice that since the scheduler runs as a main loop with interrupts enabled, the execution of a task can be stopped to service an interrupt. To ensure that tasks can be safely added from an interrupt context the $scheduler\_push$ function temporarily disables and re-enables interrupts using the $cpu\_disable\_interrupts$ and $cpu\_enable\_interrupts$ functions.
+\end{itemize}
+
+%%
+% Tools
+%%
+\section{Tools}
+The $tools$ folder contains the $cc2538-bsl$ Python script that is used to flash the OpenMote-CC2538 using the bootloader mode through the serial port instead of the JTAG. The $cc2538-bsl$ script is called from the $Makefile$ system with the appropriate parameters by executing $make TARGET=cc2538 bsl$. The only pre-requisite is that the OpenMote-CC2538 has to be in bootload mode prior to executing the command, otherwise the board will not be flashed. The benefits of using the bootloader mode to program the OpenMote-CC2538 board is that the Segger J-Link is not required. The disadvantage of using the bootloader mode to program the OpenMote-CC2538 is that real-time debugging of the code and variables is not possible. However, it is possible to debug the code execution flow without the Segger J-Link interface by using the serial port to output debugging messages. It is important to take into account that using the serial port to output debugging messages alters the timing of code execution, making it an unsuitable approach to debug real-time code.
